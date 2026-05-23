@@ -24,23 +24,18 @@ config = load_config()
 HOST = get_client_host(config)
 PORT = config['port']
 
-client = socket.socket(
-    socket.AF_INET,
-    socket.SOCK_STREAM
-)
+client = None
+connected = False
 
 context = {
     'running': True,
+    'chat_running': False,
     'username': 'Client1',
     'is_host': False
 }
 
-client.connect((HOST, PORT))
-
-print('[CLIENT] Connected successfully!')
-
-def recieve_messages():
-    while context['running']:
+def receive_messages():
+    while context['chat_running']:
         try:
             message = client.recv(1024).decode()
         except OSError:
@@ -60,14 +55,19 @@ def recieve_messages():
 
         print(message)
 
-    context['running'] = False
+    context['chat_running'] = False
+    connected = False
 
 def send_messages():
-    while context['running']:
+    while context['chat_running']:
         try:
             message = input('')
         except (EOFError, KeyboardInterrupt):
             context['running'] = False
+            break
+
+        if message == '/disconnect':
+            disconnect()
             break
 
         result = handle_command(message, context)
@@ -79,16 +79,87 @@ def send_messages():
                 context['running'] = False
                 break
 
-    client.close()
+    if client:
+        client.close()
 
-recieve_thread = threading.Thread(
-    target=recieve_messages,
-    daemon=True
-)
+def connect_to_server(host, port):
+    global client
+    global connected
 
-send_thread = threading.Thread(
-    target=send_messages
-)
+    client = socket.socket(
+        socket.AF_INET,
+        socket.SOCK_STREAM
+    )
 
-recieve_thread.start()
-send_thread.start()
+    try:
+        client.connect((host, port))
+
+    except OSError as e:
+        print(f'[ERROR] {e}')
+
+        return
+
+    connected = True
+    context['chat_running'] = True
+
+    print(f'[CONNECTED] {host}:{port}')
+
+    receive_thread = threading.Thread(
+        target=receive_messages,
+        daemon=True
+    )
+
+    send_thread = threading.Thread(
+        target=send_messages
+    )
+
+    receive_thread.start()
+    send_thread.start()
+
+    send_thread.join()
+
+    connected = False
+
+def disconnect():
+    global client
+    global connected
+
+    connected = False
+
+    context['running'] = False
+
+    if client:
+        try:
+            client.close()
+
+        except OSError:
+            pass
+
+    client = None
+
+    print('[DISCONNECTED]')
+
+while context['running']:
+    command = input('>>> ').strip()
+
+    if command.startswith('connect '):
+        try:
+            address = command.split()[1]
+
+            host, port = address.split(':')
+
+            connect_to_server(
+                host,
+                int(port)
+            )
+
+        except ValueError:
+            print(
+                '[ERROR] Use: connect IP:PORT'
+            )
+
+    elif command == 'exit':
+        break
+
+    else:
+        print('[ERROR] Unknown command.')
