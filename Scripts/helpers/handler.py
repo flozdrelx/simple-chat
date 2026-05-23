@@ -13,6 +13,9 @@ from set_user import set_user
 from clear import clear
 from host import host
 from ping import ping
+from see_users import see_users
+from kick import kick
+from set_pswd import set_pswd
 
 COMMANDS = {
     '/clear': clear,
@@ -20,7 +23,10 @@ COMMANDS = {
     '/help': help,
     '/set_user': set_user,
     '/host': host,
-    '/ping': ping
+    '/ping': ping,
+    '/see_users': see_users,
+    '/kick': kick,
+    '/set_pswd': set_pswd
 }
 
 def handle_command(message, context):

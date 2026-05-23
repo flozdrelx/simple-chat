@@ -36,7 +36,10 @@ server = socket.socket(
 context = {
     'running': True,
     'username': 'Host',
-    'is_host': True
+    'is_host': True,
+    'clients': clients,
+    'clients_lock': clients_lock,
+    'password': ''
 }
 
 server.setsockopt(
@@ -73,12 +76,12 @@ print(f'[SHARE] Server address: {ip}:{PORT}')
 
 def broadcast(message, sender=None):
     with clients_lock:
-        for client in clients[:]:
-            if client != sender:
+        for c in clients[:]:
+            if c['socket'] != sender:
                 try:
-                    client.send(message.encode())
+                    c['socket'].send(message.encode())
                 except OSError:
-                    clients.remove(client)
+                    clients.remove(c)
 
 def send_system_message(client, message):
     try:
@@ -86,12 +89,70 @@ def send_system_message(client, message):
     except OSError:
         remove_client(client)
 
-def remove_client(client):
+def remove_client(client_socket):
     with clients_lock:
-        if client in clients:
-            clients.remove(client)
+        for c in clients[:]:
+            if c['socket'] == client_socket:
+                clients.remove(c)
+                break
 
-def handle_client(client, address, username):
+def handle_client(client, address, client_id):
+    global next_client_id
+
+    username = f'Client{client_id} (ID: {client_id})'
+
+    client.settimeout(5.0)
+    try:
+        auth_msg = client.recv(1024).decode()
+    except (OSError, socket.timeout):
+        try:
+            client.send('[SERVER] Handshake timeout. Connection closed.'.encode())
+            client.close()
+        except OSError:
+            pass
+        return
+
+    client.settimeout(None)
+
+    provided_password = ""
+    if auth_msg.startswith('__AUTH__:'):
+        provided_password = auth_msg.split(':', 1)[1]
+
+    expected_password = context.get('password', '')
+    if expected_password and provided_password != expected_password:
+        try:
+            client.send('[SERVER] Incorrect password. Connection closed.'.encode())
+            client.close()
+        except OSError:
+            pass
+        print(f'[REJECTED] {address} - incorrect password')
+        return
+
+    with clients_lock:
+        if len(clients) >= MAX_CLIENTS:
+            try:
+                client.send('[SERVER] Chat is full. Try again later.'.encode())
+                client.close()
+            except OSError:
+                pass
+            print(f'[REJECTED] {address} - server full')
+            return
+
+        client_record = {
+            'id': client_id,
+            'socket': client,
+            'address': address,
+            'username': username
+        }
+        clients.append(client_record)
+
+    try:
+        client.send(f'__SET_USERNAME__:{username}'.encode())
+    except OSError:
+        remove_client(client)
+        client.close()
+        return
+
     print(f'[CONNECTED] {address} as {username}')
 
     last_message_time = 0
@@ -111,6 +172,21 @@ def handle_client(client, address, username):
                 client.send(pong.encode())
             except OSError:
                 pass
+            continue
+
+        if message.startswith('__CHANGE_USERNAME__:'):
+            new_username = message.split(':', 1)[1]
+            with clients_lock:
+                for c in clients:
+                    if c['socket'] == client:
+                        old_username = c['username']
+                        c['username'] = f'{new_username} (ID: {c["id"]})'
+                        try:
+                            client.send(f'__SET_USERNAME__:{new_username} (ID: {c["id"]})'.encode())
+                        except OSError:
+                            pass
+                        print(f'[INFO] {address} (ID: {c["id"]}) changed username from {old_username} to {new_username} (ID: {c["id"]})')
+                        break
             continue
 
         current_time = time.time()
@@ -135,13 +211,12 @@ def shutdown_server():
     print('[SERVER] Shutting down...')
 
     with clients_lock:
-        for client in clients[:]:
+        for c in clients[:]:
             try:
-                client.send(
+                c['socket'].send(
                     '[SERVER] Server shutting down.'.encode()
                 )
-
-                client.close()
+                c['socket'].close()
             except OSError:
                 pass
 
@@ -181,22 +256,12 @@ while context['running']:
     try:
         client, address = server.accept()
 
-        with clients_lock:
-            if len(clients) >= MAX_CLIENTS:
-                client.send('[SERVER] Chat is full. Try again later.'.encode())
-                client.close()
-                print(f'[REJECTED] {address} - server full')
-                continue
-
-            username = f'Client{next_client_id}'
-            next_client_id += 1
-            clients.append(client)
-
-        client.send(f'__SET_USERNAME__:{username}'.encode())
+        client_id = next_client_id
+        next_client_id += 1
 
         thread = threading.Thread(
             target=handle_client,
-            args=(client, address, username),
+            args=(client, address, client_id),
             daemon=True
         )
 

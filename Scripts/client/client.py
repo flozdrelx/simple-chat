@@ -102,7 +102,7 @@ def send_messages():
     if client:
         client.close()
 
-def connect_to_server(host, port):
+def connect_to_server(host, port, password=""):
     global client
     global connected
 
@@ -119,6 +119,14 @@ def connect_to_server(host, port):
     except OSError as e:
         print(f'[ERROR] {e}')
 
+        return
+
+    # Immediately send the auth message
+    try:
+        client.send(f'__AUTH__:{password}'.encode())
+    except OSError as e:
+        print(f'[ERROR] Failed to send authentication: {e}')
+        client.close()
         return
 
     connected = True
@@ -170,7 +178,7 @@ def disconnect():
 
 def print_main_menu():
     print("Main menu:")
-    print("    * Use '/connect <ip:port>' to connect into a server")
+    print("    * Use '/connect <ip:port> [password]' to connect into a server")
     print()
 
 print_main_menu()
@@ -188,12 +196,14 @@ while context['running']:
             if len(cmd_parts) < 2:
                 raise ValueError
             address = cmd_parts[1]
+            password = cmd_parts[2] if len(cmd_parts) > 2 else ""
 
             host, port = address.split(':')
 
             connect_to_server(
                 host,
-                int(port)
+                int(port),
+                password
             )
 
             if context['running']:
@@ -202,7 +212,7 @@ while context['running']:
 
         except ValueError:
             print(
-                '[ERROR] Use: /connect IP:PORT'
+                '[ERROR] Use: /connect IP:PORT [PASSWORD]'
             )
     elif cmd_name in ('exit', '/exit'):
         break
