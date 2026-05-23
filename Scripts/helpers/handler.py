@@ -11,12 +11,14 @@ from exit import exit
 from help import help
 from set_user import set_user
 from clear import clear
+from host import host
 
 COMMANDS = {
     '/clear': clear,
     '/exit': exit,
     '/help': help,
-    '/set_user': set_user
+    '/set_user': set_user,
+    '/host': host
 }
 
 def handle_command(message, context):

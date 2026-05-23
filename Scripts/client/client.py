@@ -35,9 +35,13 @@ context = {
 }
 
 def receive_messages():
+    global connected
+
     while context['chat_running']:
         try:
             message = client.recv(1024).decode()
+        except socket.timeout:
+            continue
         except OSError:
             break
 
@@ -63,10 +67,15 @@ def send_messages():
         try:
             message = input('')
         except (EOFError, KeyboardInterrupt):
-            context['running'] = False
+            context['chat_running'] = False
             break
 
-        if message == '/disconnect':
+        if message.strip() in ('/disconnect', 'disconnect'):
+            disconnect()
+            break
+
+        if message.strip() in ('/exit', 'exit'):
+            context['running'] = False
             disconnect()
             break
 
@@ -76,7 +85,7 @@ def send_messages():
             try:
                 client.send(f'{context["username"]}: {result}'.encode())
             except OSError:
-                context['running'] = False
+                context['chat_running'] = False
                 break
 
     if client:
@@ -91,9 +100,11 @@ def connect_to_server(host, port):
         socket.SOCK_STREAM
     )
 
+    client.settimeout(10)
+
     try:
         client.connect((host, port))
-
+        client.settimeout(None)
     except OSError as e:
         print(f'[ERROR] {e}')
 
@@ -101,6 +112,11 @@ def connect_to_server(host, port):
 
     connected = True
     context['chat_running'] = True
+    context['ip'] = host
+    context['port'] = port
+
+    # Clear screen upon successful connection
+    os.system('cls' if os.name == 'nt' else 'clear')
 
     print(f'[CONNECTED] {host}:{port}')
 
@@ -126,7 +142,7 @@ def disconnect():
 
     connected = False
 
-    context['running'] = False
+    context['chat_running'] = False
 
     if client:
         try:
@@ -139,12 +155,26 @@ def disconnect():
 
     print('[DISCONNECTED]')
 
+def print_main_menu():
+    print("Main menu:")
+    print("    * Use '/connect <ip:port>' to connect into a server")
+    print()
+
+print_main_menu()
+
 while context['running']:
     command = input('>>> ').strip()
+    if not command:
+        continue
 
-    if command.startswith('connect '):
+    cmd_parts = command.split()
+    cmd_name = cmd_parts[0]
+
+    if cmd_name in ('connect', '/connect'):
         try:
-            address = command.split()[1]
+            if len(cmd_parts) < 2:
+                raise ValueError
+            address = cmd_parts[1]
 
             host, port = address.split(':')
 
@@ -153,13 +183,15 @@ while context['running']:
                 int(port)
             )
 
+            if context['running']:
+                os.system('cls' if os.name == 'nt' else 'clear')
+                print_main_menu()
+
         except ValueError:
             print(
-                '[ERROR] Use: connect IP:PORT'
+                '[ERROR] Use: /connect IP:PORT'
             )
-
-    elif command == 'exit':
+    elif cmd_name in ('exit', '/exit'):
         break
-
     else:
         print('[ERROR] Unknown command.')

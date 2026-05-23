@@ -45,11 +45,31 @@ server.setsockopt(
     1
 )
 
+def get_ip_address():
+    if HOST != '0.0.0.0':
+        return HOST
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(('8.8.8.8', 1))
+        IP = s.getsockname()[0]
+    except Exception:
+        try:
+            IP = socket.gethostbyname(socket.gethostname())
+        except Exception:
+            IP = '127.0.0.1'
+    finally:
+        s.close()
+    return IP
+
 server.bind((HOST, PORT))
 server.listen(MAX_CLIENTS)
 
+ip = get_ip_address()
+context['ip'] = ip
+context['port'] = PORT
 print(f'[SERVER] Listening on {HOST}:{PORT}...')
 print(f'[SERVER] Max clients: {MAX_CLIENTS}')
+print(f'[SHARE] Server address: {ip}:{PORT}')
 
 def broadcast(message, sender=None):
     with clients_lock:

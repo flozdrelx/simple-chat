@@ -6,6 +6,7 @@ Current commands:
     * /exit             -  Leave or close the chat
     * /clear            -  Clear the chat (host only)
     * /set_user <user>  -  Set your username
+    * /host             -  Show server connection address
 '''
 
     print(help_msg)
