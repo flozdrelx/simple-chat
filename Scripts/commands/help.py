@@ -8,6 +8,7 @@ Current commands:
     * /set_user <user>  -  Set your username
     * /host             -  Show server connection address
     * /disconnect       -  Disconnect from server (client only)
+    * /ping             -  Check your ping to the server
 '''
 
     print(help_msg)

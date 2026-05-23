@@ -105,6 +105,14 @@ def handle_client(client, address, username):
         if not message:
             break
 
+        if message.startswith('__PING__:'):
+            try:
+                pong = message.replace('__PING__:', '__PONG__:', 1)
+                client.send(pong.encode())
+            except OSError:
+                pass
+            continue
+
         current_time = time.time()
 
         if current_time - last_message_time < config['message_cooldown']:

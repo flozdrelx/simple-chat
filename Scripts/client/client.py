@@ -2,6 +2,7 @@ import socket
 import threading
 import os
 import sys
+import time
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 helpers_dir = os.path.join(current_dir, "..", "helpers")
@@ -31,7 +32,8 @@ context = {
     'running': True,
     'chat_running': False,
     'username': 'Client1',
-    'is_host': False
+    'is_host': False,
+    'client': None
 }
 
 def receive_messages():
@@ -55,6 +57,15 @@ def receive_messages():
         if message.startswith(USERNAME_SIGNAL):
             context['username'] = message[len(USERNAME_SIGNAL):]
             print(f'[SYSTEM] Your username is {context["username"]}')
+            continue
+
+        if message.startswith('__PONG__:'):
+            try:
+                sent_time = float(message.split(':', 1)[1])
+                latency = (time.time() - sent_time) * 1000
+                print(f'[PING] Latency: {latency:.2f} ms')
+            except (ValueError, IndexError):
+                print('[PING] Invalid pong response received.')
             continue
 
         print(message)
@@ -114,6 +125,7 @@ def connect_to_server(host, port):
     context['chat_running'] = True
     context['ip'] = host
     context['port'] = port
+    context['client'] = client
 
     # Clear screen upon successful connection
     os.system('cls' if os.name == 'nt' else 'clear')
@@ -143,6 +155,7 @@ def disconnect():
     connected = False
 
     context['chat_running'] = False
+    context['client'] = None
 
     if client:
         try:
