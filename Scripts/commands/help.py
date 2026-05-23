@@ -7,6 +7,7 @@ Current commands:
     * /clear            -  Clear the chat (host only)
     * /set_user <user>  -  Set your username
     * /host             -  Show server connection address
+    * /disconnect       -  Disconnect from server (client only)
 '''
 
     print(help_msg)

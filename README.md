@@ -1,3 +1,11 @@
+# Simple Chat
+
+#### Portfolio Project
+
+A simple CLI-based chat application that allows anyone to host and join a chat server.
+
+---
+
 # How to Use
 
 ## Windows
