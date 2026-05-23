@@ -5,15 +5,24 @@ import sys
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 helpers_dir = os.path.join(current_dir, "..", "helpers")
+shared_dir = os.path.join(current_dir, "..", "shared")
 
 if helpers_dir not in sys.path:
     sys.path.append(os.path.abspath(helpers_dir))
 
+if shared_dir not in sys.path:
+    sys.path.append(os.path.abspath(shared_dir))
+
 from handler import handle_command
 from clear import CLEAR_SIGNAL
+from config import get_client_host, load_config
 
-HOST = '127.0.0.1'
-PORT = 6667
+USERNAME_SIGNAL = '__SET_USERNAME__:'
+
+config = load_config()
+
+HOST = get_client_host(config)
+PORT = config['port']
 
 client = socket.socket(
     socket.AF_INET,
@@ -42,6 +51,11 @@ def recieve_messages():
 
         if message == CLEAR_SIGNAL:
             os.system('cls' if os.name == 'nt' else 'clear')
+            continue
+
+        if message.startswith(USERNAME_SIGNAL):
+            context['username'] = message[len(USERNAME_SIGNAL):]
+            print(f'[SYSTEM] Your username is {context["username"]}')
             continue
 
         print(message)
