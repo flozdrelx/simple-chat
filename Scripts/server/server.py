@@ -1,4 +1,4 @@
-it worksimport socket
+import socket
 import threading
 import os
 import sys
