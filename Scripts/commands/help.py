@@ -5,7 +5,7 @@ Current commands:
     * /help                       -  Shows this message
     * /exit                       -  Leave or close the chat
     * /set_user <user>            -  Set your username
-    * /host                       -  Show server connection address
+    * /host                       -  Show safe server sharing info
     * /disconnect                 -  Disconnect from server (client only)
     * /ping                       -  Check your ping to the server
 '''

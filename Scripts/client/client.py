@@ -7,12 +7,16 @@ import time
 current_dir = os.path.dirname(os.path.abspath(__file__))
 helpers_dir = os.path.join(current_dir, "..", "helpers")
 shared_dir = os.path.join(current_dir, "..", "shared")
+commands_dir = os.path.join(current_dir, "..", "commands")
 
 if helpers_dir not in sys.path:
     sys.path.append(os.path.abspath(helpers_dir))
 
 if shared_dir not in sys.path:
     sys.path.append(os.path.abspath(shared_dir))
+
+if commands_dir not in sys.path:
+    sys.path.append(os.path.abspath(commands_dir))
 
 from handler import handle_command
 from clear import CLEAR_SIGNAL
@@ -115,7 +119,6 @@ def connect_to_server(host, port, password=""):
 
     try:
         client.connect((host, port))
-        client.settimeout(None)
     except OSError as e:
         print(f'[ERROR] {e}')
 
@@ -129,16 +132,37 @@ def connect_to_server(host, port, password=""):
         client.close()
         return
 
+    try:
+        initial_message = client.recv(1024).decode()
+    except (OSError, socket.timeout) as e:
+        print(f'[ERROR] Failed to complete server handshake: {e}')
+        client.close()
+        return
+
+    if not initial_message:
+        print('[ERROR] Server closed the connection.')
+        client.close()
+        return
+
+    if initial_message.startswith(USERNAME_SIGNAL):
+        context['username'] = initial_message[len(USERNAME_SIGNAL):]
+    else:
+        print(initial_message)
+        client.close()
+        return
+
+    client.settimeout(None)
+
     connected = True
     context['chat_running'] = True
-    context['ip'] = host
     context['port'] = port
     context['client'] = client
 
     # Clear screen upon successful connection
     os.system('cls' if os.name == 'nt' else 'clear')
 
-    print(f'[CONNECTED] {host}:{port}')
+    print('[CONNECTED] Connected to server.')
+    print(f'[SYSTEM] Your username is {context["username"]}')
 
     receive_thread = threading.Thread(
         target=receive_messages,
@@ -178,7 +202,7 @@ def disconnect():
 
 def print_main_menu():
     print("Main menu:")
-    print("    * Use '/connect <ip:port> [password]' to connect into a server")
+    print("    * Use '/connect <address:port> [password]' to connect into a server")
     print()
 
 print_main_menu()
@@ -196,9 +220,9 @@ while context['running']:
             if len(cmd_parts) < 2:
                 raise ValueError
             address = cmd_parts[1]
-            password = cmd_parts[2] if len(cmd_parts) > 2 else ""
+            password = " ".join(cmd_parts[2:]) if len(cmd_parts) > 2 else ""
 
-            host, port = address.split(':')
+            host, port = address.rsplit(':', 1)
 
             connect_to_server(
                 host,
@@ -212,7 +236,7 @@ while context['running']:
 
         except ValueError:
             print(
-                '[ERROR] Use: /connect IP:PORT [PASSWORD]'
+                '[ERROR] Use: /connect ADDRESS:PORT [PASSWORD]'
             )
     elif cmd_name in ('exit', '/exit'):
         break

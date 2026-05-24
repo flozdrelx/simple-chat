@@ -17,5 +17,5 @@ def see_users(args, context):
 
         print('\n=== Connected Users ===')
         for c in clients:
-            print(f"ID: {c['id']} | Username: {c['username']} | Address: {c['address'][0]}:{c['address'][1]}")
+            print(f"ID: {c['id']} | Username: {c['username']}")
         print('=======================\n')

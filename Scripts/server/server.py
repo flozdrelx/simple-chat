@@ -7,12 +7,16 @@ import time
 current_dir = os.path.dirname(os.path.abspath(__file__))
 helpers_dir = os.path.join(current_dir, "..", "helpers")
 shared_dir = os.path.join(current_dir, "..", "shared")
+commands_dir = os.path.join(current_dir, "..", "commands")
 
 if helpers_dir not in sys.path:
     sys.path.append(os.path.abspath(helpers_dir))
 
 if shared_dir not in sys.path:
     sys.path.append(os.path.abspath(shared_dir))
+
+if commands_dir not in sys.path:
+    sys.path.append(os.path.abspath(commands_dir))
 
 from handler import handle_command
 from clear import CLEAR_SIGNAL
@@ -39,7 +43,8 @@ context = {
     'is_host': True,
     'clients': clients,
     'clients_lock': clients_lock,
-    'password': ''
+    'password': '',
+    'share_address': config.get('share_address', '')
 }
 
 server.setsockopt(
@@ -48,31 +53,14 @@ server.setsockopt(
     1
 )
 
-def get_ip_address():
-    if HOST != '0.0.0.0':
-        return HOST
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        s.connect(('8.8.8.8', 1))
-        IP = s.getsockname()[0]
-    except Exception:
-        try:
-            IP = socket.gethostbyname(socket.gethostname())
-        except Exception:
-            IP = '127.0.0.1'
-    finally:
-        s.close()
-    return IP
-
 server.bind((HOST, PORT))
 server.listen(MAX_CLIENTS)
 
-ip = get_ip_address()
-context['ip'] = ip
 context['port'] = PORT
-print(f'[SERVER] Listening on {HOST}:{PORT}...')
+print(f'[SERVER] Listening on configured port {PORT}...')
 print(f'[SERVER] Max clients: {MAX_CLIENTS}')
-print(f'[SHARE] Server address: {ip}:{PORT}')
+print('[PRIVACY] Client IP addresses are hidden in this app.')
+print('[SHARE] Use a tunnel address, such as playit.gg, when sharing this server.')
 
 def broadcast(message, sender=None):
     with clients_lock:
@@ -96,10 +84,11 @@ def remove_client(client_socket):
                 clients.remove(c)
                 break
 
-def handle_client(client, address, client_id):
+def handle_client(client, client_id):
     global next_client_id
 
     username = f'Client{client_id} (ID: {client_id})'
+    client_label = f'Client ID {client_id}'
 
     client.settimeout(5.0)
     try:
@@ -125,7 +114,7 @@ def handle_client(client, address, client_id):
             client.close()
         except OSError:
             pass
-        print(f'[REJECTED] {address} - incorrect password')
+        print(f'[REJECTED] {client_label} - incorrect password')
         return
 
     with clients_lock:
@@ -135,13 +124,12 @@ def handle_client(client, address, client_id):
                 client.close()
             except OSError:
                 pass
-            print(f'[REJECTED] {address} - server full')
+            print(f'[REJECTED] {client_label} - server full')
             return
 
         client_record = {
             'id': client_id,
             'socket': client,
-            'address': address,
             'username': username
         }
         clients.append(client_record)
@@ -153,7 +141,7 @@ def handle_client(client, address, client_id):
         client.close()
         return
 
-    print(f'[CONNECTED] {address} as {username}')
+    print(f'[CONNECTED] {username}')
 
     last_message_time = 0
 
@@ -185,7 +173,7 @@ def handle_client(client, address, client_id):
                             client.send(f'__SET_USERNAME__:{new_username} (ID: {c["id"]})'.encode())
                         except OSError:
                             pass
-                        print(f'[INFO] {address} (ID: {c["id"]}) changed username from {old_username} to {new_username} (ID: {c["id"]})')
+                        print(f'[INFO] ID {c["id"]} changed username from {old_username} to {new_username} (ID: {c["id"]})')
                         break
             continue
 
@@ -205,7 +193,7 @@ def handle_client(client, address, client_id):
 
     client.close()
 
-    print(f'[DISCONNECTED] {address}')
+    print(f'[DISCONNECTED] {username}')
 
 def shutdown_server():
     print('[SERVER] Shutting down...')
@@ -254,14 +242,14 @@ server.settimeout(1)
 
 while context['running']:
     try:
-        client, address = server.accept()
+        client, _ = server.accept()
 
         client_id = next_client_id
         next_client_id += 1
 
         thread = threading.Thread(
             target=handle_client,
-            args=(client, address, client_id),
+            args=(client, client_id),
             daemon=True
         )
 

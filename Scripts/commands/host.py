@@ -1,10 +1,12 @@
 def host(args, context):
-    ip = context.get('ip')
+    address = context.get('share_address')
     port = context.get('port')
-    if ip and port:
-        if context.get('is_host'):
-            print(f'[SHARE] Server address: {ip}:{port}')
+    if context.get('is_host'):
+        if address:
+            print(f'[SHARE] Server address: {address}')
+        elif port:
+            print('[SHARE] Start a tunnel, then share the tunnel address shown by that service.')
         else:
-            print(f'[INFO] Connected to server: {ip}:{port}')
+            print('[ERROR] Connection details not available.')
     else:
-        print('[ERROR] Connection details not available.')
+        print('[INFO] Connected to server.')
