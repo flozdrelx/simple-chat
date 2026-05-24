@@ -80,38 +80,18 @@ to view all available chat commands.
 
 # Privacy and Tunneling
 
-The app does not show client IP addresses in the chat, host logs, or `/see_users`.
-The host still receives network connections at the operating system level, so use a
-tunnel if you do not want players to connect directly to the host machine.
+The application does not display client IP addresses in:
+- Chat messages
+- Host logs
+- `/see_users`
 
-## Hide the Host IP with playit.gg
+However, the host machine still receives network connections at the operating system level.  
+If you do not want users connecting directly to your public IP address, consider using a tunneling service.
 
-1. Start the chat server first. By default it listens on port `6667`.
-2. Install and open the playit.gg agent from https://playit.gg/.
-3. Create a tunnel for a TCP service.
-4. Set the local address/port in playit to your chat server:
+---
 
-```text
-127.0.0.1:PORT
-```
+# Hide the Host IP with Pinggy
 
-5. playit will give you a public address, usually a hostname plus port.
-6. Give users only the playit address, not your home IP.
-7. Clients connect with:
+To avoid exposing your public IP address, you can use a tunneling service such as Pinggy.
 
-```text
-/connect PLAYIT_ADDRESS:PLAYIT_PORT
-```
-
-Tunnel URLs with a TCP scheme also work, for example:
-
-```text
-/connect tcp://nnqds-157-100-87-219.run.pinggy-free.link:35561
-```
-
-If you change the chat port in `Scripts/config/config.json`, use the same port in
-the playit tunnel.
-
-Optional: put the playit address in `share_address` inside
-`Scripts/config/config.json`. Then the host can run `/host` to print the tunnel
-address instead of a local IP.
+Pinggy allows you to create a public TCP tunnel that forwards traffic to your local chat server, allowing users to connect using a generated tunnel URL instead of your real IP address.
