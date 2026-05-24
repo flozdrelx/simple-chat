@@ -231,7 +231,7 @@ def disconnect():
 
 def print_main_menu():
     print("Main menu:")
-    print("    * Use '/connect <address:port|url://address:port> [password]' to connect into a server")
+    print("    * Use '/connect <address:port|tunnel.domain:port> [password]' to connect into a server")
     print()
 
 print_main_menu()
@@ -265,7 +265,7 @@ while context['running']:
 
         except ValueError:
             print(
-                '[ERROR] Use: /connect ADDRESS:PORT [PASSWORD] or /connect URL://ADDRESS:PORT [PASSWORD]'
+                '[ERROR] Use: /connect ADDRESS:PORT [PASSWORD] or /connect TUNNEL.DOMAIN:PORT [PASSWORD]'
             )
     elif cmd_name in ('exit', '/exit'):
         break
