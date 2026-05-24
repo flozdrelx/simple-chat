@@ -107,7 +107,7 @@ for listener in server_sockets:
     print(f'[SERVER] Bound to {listener.getsockname()[0]}:{listener.getsockname()[1]}')
 print(f'[SERVER] Max clients: {MAX_CLIENTS}')
 print('[PRIVACY] Client IP addresses are hidden in this app.')
-print('[SHARE] Use a tunnel address, such as playit.gg, when sharing this server.')
+print('[SHARE] Use a tunnel address, such as pinggy, when sharing this server.')
 
 def broadcast(message, sender=None):
     with clients_lock:
