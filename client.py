@@ -91,13 +91,13 @@ def open_tcp_connection(host, port, timeout=10):
     raise OSError(f'Could not connect to {host}:{port}: {last_error}')
 
 
-def append_text(message, tag='left'):
+def append_text(message):
     if not message:
         return
     if GUI_AVAILABLE and root and chat_text:
         def append():
             chat_text.configure(state='normal')
-            chat_text.insert('end', message + '\n', tag)
+            chat_text.insert('end', message + '\n')
             chat_text.see('end')
             chat_text.configure(state='disabled')
         try:
@@ -200,10 +200,8 @@ def process_user_message(message):
         if not client:
             append_text('[ERROR] Not connected to a server.')
             return
-        formatted = f'{context["username"]}: {result}'
-        append_text(formatted, tag='right')
         try:
-            client.send(formatted.encode())
+            client.send(f'{context["username"]}: {result}'.encode())
         except OSError:
             append_text('[ERROR] Failed to send message.')
             context['chat_running'] = False
@@ -321,8 +319,6 @@ def build_gui():
     chat_frame.pack(fill='both', expand=True, padx=10, pady=(5, 0))
     chat_text = ScrolledText(chat_frame, state='disabled', wrap='word')
     chat_text.pack(fill='both', expand=True)
-    chat_text.tag_configure('left', justify='left', foreground='black')
-    chat_text.tag_configure('right', justify='right', foreground='#0B5394')
     input_frame = tk.Frame(root)
     input_frame.pack(fill='x', padx=10, pady=10)
     message_entry = tk.Entry(input_frame, state='disabled')

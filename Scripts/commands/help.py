@@ -1,4 +1,4 @@
-def help(args, context):
+def help(args, context, output_func=print):
     help_msg = '''
 Current commands:
 
@@ -19,4 +19,4 @@ Host Administration commands:
     * /set_pswd <password>        -  Set/change server password (empty to clear)
 '''
 
-    print(help_msg)
+    output_func(help_msg)

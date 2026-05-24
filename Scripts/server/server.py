@@ -23,6 +23,13 @@ from handler import handle_command
 from clear import CLEAR_SIGNAL
 from config import load_config
 
+try:
+    import tkinter as tk
+    from tkinter.scrolledtext import ScrolledText
+    GUI_AVAILABLE = True
+except ImportError:
+    GUI_AVAILABLE = False
+
 config = load_config()
 
 HOST = config['host']
@@ -102,12 +109,13 @@ def create_server_sockets(host, port, max_clients):
 server_sockets = create_server_sockets(HOST, PORT, MAX_CLIENTS)
 
 context['port'] = PORT
-print(f'[SERVER] Listening on configured port {PORT}...')
-for listener in server_sockets:
-    print(f'[SERVER] Bound to {listener.getsockname()[0]}:{listener.getsockname()[1]}')
-print(f'[SERVER] Max clients: {MAX_CLIENTS}')
-print('[PRIVACY] Client IP addresses are hidden in this app.')
-print('[SHARE] Use a tunnel address, such as pinggy, when sharing this server.')
+if not GUI_AVAILABLE:
+    print(f'[SERVER] Listening on configured port {PORT}...')
+    for listener in server_sockets:
+        print(f'[SERVER] Bound to {listener.getsockname()[0]}:{listener.getsockname()[1]}')
+    print(f'[SERVER] Max clients: {MAX_CLIENTS}')
+    print('[PRIVACY] Client IP addresses are hidden in this app.')
+    print('[SHARE] Use a tunnel address, such as pinggy, when sharing this server.')
 
 def broadcast(message, sender=None):
     with clients_lock:
@@ -161,7 +169,7 @@ def handle_client(client, client_id):
             client.close()
         except OSError:
             pass
-        print(f'[REJECTED] {client_label} - incorrect password')
+        append_text(f'[REJECTED] {client_label} - incorrect password')
         return
 
     with clients_lock:
@@ -171,7 +179,7 @@ def handle_client(client, client_id):
                 client.close()
             except OSError:
                 pass
-            print(f'[REJECTED] {client_label} - server full')
+            append_text(f'[REJECTED] {client_label} - server full')
             return
 
         client_record = {
@@ -188,7 +196,7 @@ def handle_client(client, client_id):
         client.close()
         return
 
-    print(f'[CONNECTED] {username}')
+    append_text(f'[CONNECTED] {username}')
 
     last_message_time = 0
 
@@ -220,7 +228,7 @@ def handle_client(client, client_id):
                             client.send(f'__SET_USERNAME__:{new_username} (ID: {c["id"]})'.encode())
                         except OSError:
                             pass
-                        print(f'[INFO] ID {c["id"]} changed username from {old_username} to {new_username} (ID: {c["id"]})')
+                        append_text(f'[INFO] ID {c["id"]} changed username from {old_username} to {new_username} (ID: {c["id"]})')
                         break
             continue
 
@@ -232,7 +240,7 @@ def handle_client(client, client_id):
 
         last_message_time = current_time
 
-        print(message)
+        append_text(message, tag='left')
 
         broadcast(message, client)
 
@@ -240,7 +248,7 @@ def handle_client(client, client_id):
 
     client.close()
 
-    print(f'[DISCONNECTED] {username}')
+    append_text(f'[DISCONNECTED] {username}')
 
 def shutdown_server():
     print('[SERVER] Shutting down...')
@@ -259,6 +267,157 @@ def shutdown_server():
 
     for listener in server_sockets:
         listener.close()
+
+
+def append_text(message, tag='left'):
+    if not message:
+        return
+
+    if GUI_AVAILABLE and root and chat_text:
+        def append():
+            chat_text.configure(state='normal')
+            chat_text.insert('end', message + '\n', tag)
+            chat_text.see('end')
+            chat_text.configure(state='disabled')
+
+        try:
+            root.after(0, append)
+        except tk.TclError:
+            print(message)
+    else:
+        print(message)
+
+
+def clear_screen():
+    if GUI_AVAILABLE and root and chat_text:
+        def clear_text():
+            chat_text.configure(state='normal')
+            chat_text.delete('1.0', 'end')
+            chat_text.configure(state='disabled')
+
+        try:
+            root.after(0, clear_text)
+        except tk.TclError:
+            os.system('cls' if os.name == 'nt' else 'clear')
+    else:
+        os.system('cls' if os.name == 'nt' else 'clear')
+
+
+def process_host_message(message):
+    message = message.strip()
+    if not message:
+        return
+
+    result = handle_command(message, context, append_text)
+
+    if result:
+        formatted = f'{context["username"]}: {result}'
+        broadcast(formatted)
+        append_text(formatted, tag='right')
+    elif context.pop('clear_requested', False):
+        broadcast(CLEAR_SIGNAL)
+        clear_screen()
+
+    if not context['running'] and GUI_AVAILABLE and root:
+        try:
+            root.quit()
+        except tk.TclError:
+            pass
+
+
+def on_send_clicked(event=None):
+    if not message_entry:
+        return
+
+    message = message_entry.get().strip()
+    message_entry.delete(0, 'end')
+    process_host_message(message)
+
+
+def set_connected_ui(value):
+    if not GUI_AVAILABLE or not root:
+        return
+
+    def update():
+        if value:
+            message_entry.config(state='normal')
+            status_label.config(text=f'Host running | {len(clients)} users connected')
+        else:
+            message_entry.config(state='disabled')
+            status_label.config(text='Host console active')
+
+    try:
+        root.after(0, update)
+    except tk.TclError:
+        pass
+
+
+def accept_clients():
+    global next_client_id
+
+    while context['running']:
+        try:
+            ready_listeners, _, _ = select.select(server_sockets, [], [], 1)
+
+            if not ready_listeners:
+                continue
+
+            client, _ = ready_listeners[0].accept()
+
+            client_id = next_client_id
+            next_client_id += 1
+
+            thread = threading.Thread(
+                target=handle_client,
+                args=(client, client_id),
+                daemon=True
+            )
+            thread.start()
+        except (OSError, ValueError):
+            break
+
+
+def build_server_gui():
+    global root, chat_text, message_entry, status_label
+
+    root = tk.Tk()
+    root.title('Simple Chat Host')
+    root.geometry('620x520')
+
+    status_label = tk.Label(root, text='Host console active', anchor='w')
+    status_label.pack(fill='x', padx=10, pady=(10, 0))
+
+    chat_text = ScrolledText(root, state='disabled', wrap='word')
+    chat_text.pack(fill='both', expand=True, padx=10, pady=10)
+    chat_text.tag_configure('left', justify='left', foreground='black')
+    chat_text.tag_configure('right', justify='right', foreground='#0B5394')
+
+    input_frame = tk.Frame(root)
+    input_frame.pack(fill='x', padx=10, pady=(0, 10))
+
+    message_entry = tk.Entry(input_frame, state='disabled')
+    message_entry.pack(side='left', fill='x', expand=True, padx=(0, 5))
+    message_entry.bind('<Return>', on_send_clicked)
+
+    send_button = tk.Button(input_frame, text='Send', width=12, command=on_send_clicked)
+    send_button.pack(side='left')
+
+    shutdown_button = tk.Button(root, text='Shutdown Server', fg='white', bg='#d9534f', command=on_close)
+    shutdown_button.pack(fill='x', padx=10, pady=(0, 10))
+
+    root.protocol('WM_DELETE_WINDOW', on_close)
+    set_connected_ui(True)
+    append_text(f'[SERVER] Listening on {HOST}:{PORT}')
+    append_text('Host GUI active. Type a message and press Send.')
+    root.mainloop()
+
+
+def on_close():
+    context['running'] = False
+    shutdown_server()
+    if root:
+        root.destroy()
+
 
 def send_messages():
     while context['running']:
@@ -280,30 +439,13 @@ def send_messages():
 
     shutdown_server()
 
-host_thread = threading.Thread(
-    target=send_messages
-)
-
-host_thread.start()
-
-while context['running']:
-    try:
-        ready_listeners, _, _ = select.select(server_sockets, [], [], 1)
-
-        if not ready_listeners:
-            continue
-
-        client, _ = ready_listeners[0].accept()
-
-        client_id = next_client_id
-        next_client_id += 1
-
-        thread = threading.Thread(
-            target=handle_client,
-            args=(client, client_id),
-            daemon=True
-        )
-
-        thread.start()
-    except (OSError, ValueError):
-        break
+if GUI_AVAILABLE:
+    accept_thread = threading.Thread(target=accept_clients, daemon=True)
+    accept_thread.start()
+    build_server_gui()
+else:
+    host_thread = threading.Thread(
+        target=send_messages
+    )
+    host_thread.start()
+    accept_clients()

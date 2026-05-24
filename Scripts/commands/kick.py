@@ -1,23 +1,23 @@
-def kick(args, context):
+def kick(args, context, output_func=print):
     if not context.get('is_host'):
-        print('[ERROR] Only the host can use this command.')
+        output_func('[ERROR] Only the host can use this command.')
         return
 
     if not args:
-        print('Usage: /kick <userid>')
+        output_func('Usage: /kick <userid>')
         return
 
     try:
         kick_id = int(args[0])
     except ValueError:
-        print('[ERROR] Input a valid integer for userid.')
+        output_func('[ERROR] Input a valid integer for userid.')
         return
 
     clients = context.get('clients', [])
     clients_lock = context.get('clients_lock')
 
     if not clients_lock:
-        print('[ERROR] Client management lock is not available.')
+        output_func('[ERROR] Client management lock is not available.')
         return
 
     kicked_client = None
@@ -28,7 +28,7 @@ def kick(args, context):
                 break
 
     if not kicked_client:
-        print(f'[ERROR] User with ID {kick_id} not found.')
+        output_func(f'[ERROR] User with ID {kick_id} not found.')
         return
 
     try:
@@ -49,4 +49,4 @@ def kick(args, context):
         if kicked_client in clients:
             clients.remove(kicked_client)
 
-    print(f'[SYSTEM] Kicked user: {kicked_client["username"]} (ID: {kick_id})')
+    output_func(f'[SYSTEM] Kicked user: {kicked_client["username"]} (ID: {kick_id})')

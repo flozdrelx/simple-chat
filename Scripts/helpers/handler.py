@@ -29,7 +29,7 @@ COMMANDS = {
     '/set_pswd': set_pswd
 }
 
-def handle_command(message, context):
+def handle_command(message, context, output_func=print):
     if not message.startswith('/'):
         return message
 
@@ -39,8 +39,7 @@ def handle_command(message, context):
     args = parts[1:]
 
     if command in COMMANDS:
-        COMMANDS[command](args, context)
-
+        COMMANDS[command](args, context, output_func)
         return None
 
     return message

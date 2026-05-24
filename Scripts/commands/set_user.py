@@ -1,6 +1,6 @@
-def set_user(args, context):
+def set_user(args, context, output_func=print):
     if not args:
-        print('Usage: /set_user <username>')
+        output_func('Usage: /set_user <username>')
         return
 
     username = args[0]
@@ -14,4 +14,4 @@ def set_user(args, context):
         except OSError:
             pass
 
-    print(f'Username changed to {username}')
+    output_func(f'Username changed to {username}')

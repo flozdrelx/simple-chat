@@ -1,7 +1,7 @@
-def exit(args, context):
+def exit(args, context, output_func=print):
     if context['is_host']:
-        print('[SERVER] shutting down...')
+        output_func('[SERVER] shutting down...')
     else:
-        print('[CLIENT] Disconnecting...')
+        output_func('[CLIENT] Disconnecting...')
 
     context['running'] = False

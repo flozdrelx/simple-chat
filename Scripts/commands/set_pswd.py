@@ -1,13 +1,13 @@
-def set_pswd(args, context):
+def set_pswd(args, context, output_func=print):
     if not context.get('is_host'):
-        print('[ERROR] Only the host can use this command.')
+        output_func('[ERROR] Only the host can use this command.')
         return
 
     if not args:
         context['password'] = ''
-        print('[SYSTEM] Server password has been cleared.')
+        output_func('[SYSTEM] Server password has been cleared.')
         return
 
     password = " ".join(args)
     context['password'] = password
-    print(f'[SYSTEM] Server password set to: {password}')
+    output_func(f'[SYSTEM] Server password set to: {password}')
