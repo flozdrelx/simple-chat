@@ -40,6 +40,11 @@ clients = []
 clients_lock = threading.Lock()
 next_client_id = 1
 
+root = None
+chat_text = None
+message_entry = None
+status_label = None
+
 context = {
     'running': True,
     'username': 'Host',
@@ -118,6 +123,7 @@ if not GUI_AVAILABLE:
     print('[SHARE] Use a tunnel address, such as pinggy, when sharing this server.')
 
 def broadcast(message, sender=None):
+    removed_client = False
     with clients_lock:
         for c in clients[:]:
             if c['socket'] != sender:
@@ -125,6 +131,10 @@ def broadcast(message, sender=None):
                     c['socket'].send(message.encode())
                 except OSError:
                     clients.remove(c)
+                    removed_client = True
+
+    if removed_client:
+        refresh_connected_count()
 
 def send_system_message(client, message):
     try:
@@ -133,11 +143,33 @@ def send_system_message(client, message):
         remove_client(client)
 
 def remove_client(client_socket):
+    removed_client = False
     with clients_lock:
         for c in clients[:]:
             if c['socket'] == client_socket:
                 clients.remove(c)
+                removed_client = True
                 break
+
+    if removed_client:
+        refresh_connected_count()
+
+
+def refresh_connected_count():
+    if not GUI_AVAILABLE or not root:
+        return
+
+    with clients_lock:
+        user_count = len(clients)
+
+    def update():
+        if status_label:
+            status_label.config(text=f'Host running | {user_count} users connected')
+
+    try:
+        root.after(0, update)
+    except tk.TclError:
+        pass
 
 def handle_client(client, client_id):
     global next_client_id
@@ -188,6 +220,8 @@ def handle_client(client, client_id):
             'username': username
         }
         clients.append(client_record)
+
+    refresh_connected_count()
 
     try:
         client.send(f'__SET_USERNAME__:{username}'.encode())
@@ -265,6 +299,8 @@ def shutdown_server():
 
         clients.clear()
 
+    refresh_connected_count()
+
     for listener in server_sockets:
         listener.close()
 
@@ -309,6 +345,7 @@ def process_host_message(message):
         return
 
     result = handle_command(message, context, append_text)
+    refresh_connected_count()
 
     if result:
         formatted = f'{context["username"]}: {result}'
@@ -341,7 +378,9 @@ def set_connected_ui(value):
     def update():
         if value:
             message_entry.config(state='normal')
-            status_label.config(text=f'Host running | {len(clients)} users connected')
+            with clients_lock:
+                user_count = len(clients)
+            status_label.config(text=f'Host running | {user_count} users connected')
         else:
             message_entry.config(state='disabled')
             status_label.config(text='Host console active')
