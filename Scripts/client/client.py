@@ -3,6 +3,7 @@ import threading
 import os
 import sys
 import time
+from urllib.parse import urlparse
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 helpers_dir = os.path.join(current_dir, "..", "helpers")
@@ -39,6 +40,41 @@ context = {
     'is_host': False,
     'client': None
 }
+
+def parse_server_address(address):
+    parsed = urlparse(address if '://' in address else f'//{address}')
+
+    if not parsed.hostname or parsed.port is None:
+        raise ValueError
+
+    return parsed.hostname, parsed.port
+
+def open_tcp_connection(host, port, timeout=10):
+    last_error = None
+
+    try:
+        address_infos = socket.getaddrinfo(
+            host,
+            port,
+            type=socket.SOCK_STREAM
+        )
+    except OSError as e:
+        raise OSError(f'Could not resolve {host}:{port}: {e}') from e
+
+    for family, socktype, proto, _, sockaddr in address_infos:
+        try:
+            sock = socket.socket(family, socktype, proto)
+            sock.settimeout(timeout)
+            sock.connect(sockaddr)
+            return sock
+        except OSError as e:
+            last_error = e
+            try:
+                sock.close()
+            except OSError:
+                pass
+
+    raise OSError(f'Could not connect to {host}:{port}: {last_error}')
 
 def receive_messages():
     global connected
@@ -110,15 +146,8 @@ def connect_to_server(host, port, password=""):
     global client
     global connected
 
-    client = socket.socket(
-        socket.AF_INET,
-        socket.SOCK_STREAM
-    )
-
-    client.settimeout(10)
-
     try:
-        client.connect((host, port))
+        client = open_tcp_connection(host, port, timeout=10)
     except OSError as e:
         print(f'[ERROR] {e}')
 
@@ -202,7 +231,7 @@ def disconnect():
 
 def print_main_menu():
     print("Main menu:")
-    print("    * Use '/connect <address:port> [password]' to connect into a server")
+    print("    * Use '/connect <address:port|url://address:port> [password]' to connect into a server")
     print()
 
 print_main_menu()
@@ -222,11 +251,11 @@ while context['running']:
             address = cmd_parts[1]
             password = " ".join(cmd_parts[2:]) if len(cmd_parts) > 2 else ""
 
-            host, port = address.rsplit(':', 1)
+            host, port = parse_server_address(address)
 
             connect_to_server(
                 host,
-                int(port),
+                port,
                 password
             )
 
@@ -236,7 +265,7 @@ while context['running']:
 
         except ValueError:
             print(
-                '[ERROR] Use: /connect ADDRESS:PORT [PASSWORD]'
+                '[ERROR] Use: /connect ADDRESS:PORT [PASSWORD] or /connect URL://ADDRESS:PORT [PASSWORD]'
             )
     elif cmd_name in ('exit', '/exit'):
         break

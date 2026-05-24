@@ -103,6 +103,12 @@ tunnel if you do not want players to connect directly to the host machine.
 /connect PLAYIT_ADDRESS:PLAYIT_PORT
 ```
 
+Tunnel URLs with a TCP scheme also work, for example:
+
+```text
+/connect tcp://nnqds-157-100-87-219.run.pinggy-free.link:35561
+```
+
 If you change the chat port in `Scripts/config/config.json`, use the same port in
 the playit tunnel.
 

@@ -1,8 +1,9 @@
-import socket
+it worksimport socket
 import threading
 import os
 import sys
 import time
+import select
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 helpers_dir = os.path.join(current_dir, "..", "helpers")
@@ -32,11 +33,6 @@ clients = []
 clients_lock = threading.Lock()
 next_client_id = 1
 
-server = socket.socket(
-    socket.AF_INET,
-    socket.SOCK_STREAM
-)
-
 context = {
     'running': True,
     'username': 'Host',
@@ -47,17 +43,68 @@ context = {
     'share_address': config.get('share_address', '')
 }
 
-server.setsockopt(
-    socket.SOL_SOCKET,
-    socket.SO_REUSEADDR,
-    1
-)
+def listen_address_candidates(host):
+    if host in ('', '0.0.0.0'):
+        return [
+            (socket.AF_INET6, '::'),
+            (socket.AF_INET, '0.0.0.0')
+        ]
 
-server.bind((HOST, PORT))
-server.listen(MAX_CLIENTS)
+    if host == 'localhost':
+        return [
+            (socket.AF_INET6, '::1'),
+            (socket.AF_INET, '127.0.0.1')
+        ]
+
+    if host == '::':
+        return [(socket.AF_INET6, host)]
+
+    return [(socket.AF_INET, host)]
+
+def create_listener(family, host, port, max_clients):
+    listener = socket.socket(
+        family,
+        socket.SOCK_STREAM
+    )
+
+    listener.setsockopt(
+        socket.SOL_SOCKET,
+        socket.SO_REUSEADDR,
+        1
+    )
+
+    if family == socket.AF_INET6 and hasattr(socket, 'IPV6_V6ONLY'):
+        listener.setsockopt(
+            socket.IPPROTO_IPV6,
+            socket.IPV6_V6ONLY,
+            1
+        )
+
+    listener.bind((host, port))
+    listener.listen(max_clients)
+    return listener
+
+def create_server_sockets(host, port, max_clients):
+    listeners = []
+    last_error = None
+
+    for family, address in listen_address_candidates(host):
+        try:
+            listeners.append(create_listener(family, address, port, max_clients))
+        except OSError as e:
+            last_error = e
+
+    if not listeners:
+        raise OSError(f'Could not listen on {host}:{port}: {last_error}')
+
+    return listeners
+
+server_sockets = create_server_sockets(HOST, PORT, MAX_CLIENTS)
 
 context['port'] = PORT
 print(f'[SERVER] Listening on configured port {PORT}...')
+for listener in server_sockets:
+    print(f'[SERVER] Bound to {listener.getsockname()[0]}:{listener.getsockname()[1]}')
 print(f'[SERVER] Max clients: {MAX_CLIENTS}')
 print('[PRIVACY] Client IP addresses are hidden in this app.')
 print('[SHARE] Use a tunnel address, such as playit.gg, when sharing this server.')
@@ -210,7 +257,8 @@ def shutdown_server():
 
         clients.clear()
 
-    server.close()
+    for listener in server_sockets:
+        listener.close()
 
 def send_messages():
     while context['running']:
@@ -238,11 +286,14 @@ host_thread = threading.Thread(
 
 host_thread.start()
 
-server.settimeout(1)
-
 while context['running']:
     try:
-        client, _ = server.accept()
+        ready_listeners, _, _ = select.select(server_sockets, [], [], 1)
+
+        if not ready_listeners:
+            continue
+
+        client, _ = ready_listeners[0].accept()
 
         client_id = next_client_id
         next_client_id += 1
@@ -254,7 +305,5 @@ while context['running']:
         )
 
         thread.start()
-    except socket.timeout:
-        continue
-    except OSError:
+    except (OSError, ValueError):
         break
