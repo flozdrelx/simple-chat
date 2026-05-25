@@ -1,8 +1,8 @@
-# Simple Chat
+# Hexium Chat
 
 #### Portfolio Project
 
-A simple CLI-based chat application that allows anyone to host and join a chat server.
+A self-hosted GUI chat application focused on privacy, customization, and direct peer-to-peer style communication.
 
 ---
 
@@ -66,7 +66,31 @@ You can now test the chat application.
 
 ---
 
-# Extra
+# Current Features
+
+* Users can host their own chat server
+* Multiple users can connect and chat in real time
+* Hosts can participate in the chat
+* Basic chat commands
+* Host moderation commands
+* TCP tunneling support
+* Graphical User Interface (GUI)
+* Room password support
+* Open source and self-hosted architecture
+
+---
+
+# Planned Features
+
+* Encrypted message traffic
+* Improved privacy and security systems
+* Additional networking improvements using C/C++
+* Redesigned GUI inspired by the Hexium aesthetic
+* Better customization and room management
+
+---
+
+# Commands
 
 Use:
 
@@ -78,20 +102,92 @@ to view all available chat commands.
 
 ---
 
-# Privacy and Tunneling
+# Privacy and Security
 
-The application does not display client IP addresses in:
-- Chat messages
-- Host logs
-- `/see_users`
-
-However, the host machine still receives network connections at the operating system level.  
-If you do not want users connecting directly to your public IP address, consider using a tunneling service.
+Since this project is open source, both hosts and clients may run modified versions of the application.  
+For safer public usage and additional privacy, consider the following recommendations.
 
 ---
 
-# Hide the Host IP with Pinggy
+# 1. Use a TCP Tunneling Service (Recommended for Hosts)
 
-To avoid exposing your public IP address, you can use a tunneling service such as Pinggy.
+Hexium Chat supports TCP tunneling services such as Pinggy.
 
-Pinggy allows you to create a public TCP tunnel that forwards traffic to your local chat server, allowing users to connect using a generated tunnel URL instead of your real IP address.
+Instead of sharing your public IP address directly, you can create a tunnel that forwards traffic to your local chat server.
+
+## Example
+
+A tunneling service may generate an address similar to:
+
+```text
+tcp://example-tunnel.a.free.pinggy.link:35576
+```
+
+Clients can connect using the generated tunnel address instead of the host's public IP address.
+
+### Benefits
+
+- Reduces direct exposure of the host IP address
+- Easier room sharing
+- Adds an additional privacy layer for public sessions
+
+## Configuration
+
+1. Create a TCP tunnel pointing to your localhost port
+2. Make sure the selected port matches the one configured in:
+
+```text
+config.json
+```
+
+3. Share the generated tunnel address only with trusted users
+
+---
+
+# 2. Use Room Passwords
+
+If you are hosting a public or semi-public room, consider enabling a password.
+
+## Example
+
+```text
+/set_pswd <password>
+```
+
+### Benefits
+
+- Prevents unknown users from joining the room
+- Adds a simple access control layer
+- Useful for private sessions
+
+### Important
+
+Only share the password with users you trust.
+
+---
+
+# 3. Optional VPN Usage
+
+Both hosts and clients may optionally use a VPN for additional privacy.
+
+A VPN may help reduce exposure of:
+
+- Public IP addresses
+- Approximate location information
+- Network-related metadata
+
+### Note
+
+Depending on the provider and network conditions, VPNs and tunneling services may increase latency.
+
+---
+
+# General Recommendations
+
+For the best and safest experience:
+
+- Use the official source code from the repository
+- Avoid downloading untrusted modified builds
+- Use passwords for private rooms
+- Use a tunneling service when hosting public sessions
+- Share room access only with trusted users
