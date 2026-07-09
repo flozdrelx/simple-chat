@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 try:
     import tkinter as tk
     from tkinter.scrolledtext import ScrolledText
+
     GUI_AVAILABLE = True
 except ImportError:
     GUI_AVAILABLE = False
@@ -56,6 +57,24 @@ disconnect_button = None
 status_label = None
 address_entry = None
 password_entry = None
+send_button = None
+theme_button = None
+dark_mode = False
+light_widget_options = {}
+
+DARK_THEME = {
+    'bg': '#100b1f',
+    'panel': '#181027',
+    'field': '#211631',
+    'text': '#f4efff',
+    'muted': '#c9bce7',
+    'accent': '#9d7cff',
+    'button': '#2c1f42',
+    'button_active': '#3b2a5f',
+    'disabled': '#85779f',
+    'border': '#4c376d',
+    'self_message': '#c7a8ff',
+}
 
 
 def parse_server_address(address):
@@ -63,7 +82,6 @@ def parse_server_address(address):
     if not parsed.hostname or parsed.port is None:
         raise ValueError
     return parsed.hostname, parsed.port
-
 
 def open_tcp_connection(host, port, timeout=10):
     last_error = None
@@ -81,25 +99,30 @@ def open_tcp_connection(host, port, timeout=10):
             sock = socket.socket(family, socktype, proto)
             sock.settimeout(timeout)
             sock.connect(sockaddr)
+
             return sock
         except OSError as e:
             last_error = e
+
             try:
                 sock.close()
             except OSError:
                 pass
+
     raise OSError(f'Could not connect to {host}:{port}: {last_error}')
 
 
-def append_text(message):
+def append_text(message, tag='left'):
     if not message:
         return
+    
     if GUI_AVAILABLE and root and chat_text:
         def append():
             chat_text.configure(state='normal')
-            chat_text.insert('end', message + '\n')
+            chat_text.insert('end', message + '\n', tag)
             chat_text.see('end')
             chat_text.configure(state='disabled')
+
         try:
             root.after(0, append)
         except tk.TclError:
@@ -114,6 +137,7 @@ def clear_screen():
             chat_text.configure(state='normal')
             chat_text.delete('1.0', 'end')
             chat_text.configure(state='disabled')
+
         try:
             root.after(0, clear_text)
         except tk.TclError:
@@ -146,8 +170,113 @@ def set_connected_ui(value):
         pass
 
 
+def remember_light_options(widget):
+    options = {}
+
+    for option in (
+        'background',
+        'foreground',
+        'activebackground',
+        'activeforeground',
+        'insertbackground',
+        'selectbackground',
+        'selectforeground',
+        'disabledforeground',
+        'highlightbackground',
+        'highlightcolor',
+    ):
+        try:
+            options[option] = widget.cget(option)
+        except tk.TclError:
+            pass
+
+    light_widget_options[widget] = options
+
+    for child in widget.winfo_children():
+        remember_light_options(child)
+
+
+def configure_widget(widget, **options):
+    for option, value in options.items():
+        try:
+            widget.configure(**{option: value})
+        except tk.TclError:
+            pass
+
+
+def restore_light_theme(widget):
+    defaults = light_widget_options.get(widget, {})
+
+    if defaults:
+        configure_widget(widget, **defaults)
+    for child in widget.winfo_children():
+        restore_light_theme(child)
+
+
+def apply_dark_theme(widget):
+    widget_class = widget.winfo_class()
+
+    configure_widget(
+        widget,
+        background=DARK_THEME['bg'],
+        foreground=DARK_THEME['text'],
+        activebackground=DARK_THEME['button_active'],
+        activeforeground=DARK_THEME['text'],
+        insertbackground=DARK_THEME['text'],
+        selectbackground=DARK_THEME['accent'],
+        selectforeground=DARK_THEME['bg'],
+        disabledforeground=DARK_THEME['disabled'],
+        highlightbackground=DARK_THEME['border'],
+        highlightcolor=DARK_THEME['accent'],
+    )
+
+    if widget_class in ('Frame', 'Labelframe'):
+        configure_widget(widget, background=DARK_THEME['panel'])
+    elif widget_class in ('Entry', 'Text'):
+        configure_widget(
+            widget,
+            background=DARK_THEME['field'],
+            foreground=DARK_THEME['text'],
+            insertbackground=DARK_THEME['text'],
+        )
+    elif widget_class == 'Button':
+        configure_widget(
+            widget,
+            background=DARK_THEME['button'],
+            foreground=DARK_THEME['text'],
+            activebackground=DARK_THEME['button_active'],
+            activeforeground=DARK_THEME['text'],
+        )
+    elif widget_class == 'Label':
+        configure_widget(widget, background=DARK_THEME['bg'], foreground=DARK_THEME['muted'])
+    for child in widget.winfo_children():
+        apply_dark_theme(child)
+
+
+def apply_theme():
+    if not GUI_AVAILABLE or not root:
+        return
+    if dark_mode:
+        apply_dark_theme(root)
+        chat_text.tag_configure('left', justify='left', foreground=DARK_THEME['text'])
+        chat_text.tag_configure('right', justify='right', foreground=DARK_THEME['self_message'])
+        theme_button.config(text='Light Mode')
+    else:
+        restore_light_theme(root)
+        chat_text.tag_configure('left', justify='left', foreground='black')
+        chat_text.tag_configure('right', justify='right', foreground='#0B5394')
+        theme_button.config(text='Dark Mode')
+
+
+def toggle_theme():
+    global dark_mode
+
+    dark_mode = not dark_mode
+    apply_theme()
+
 def receive_messages():
     global connected
+
     while context['chat_running']:
         try:
             message = client.recv(1024).decode()
@@ -155,15 +284,19 @@ def receive_messages():
             continue
         except OSError:
             break
+
         if not message:
             break
+
         if message == CLEAR_SIGNAL:
             clear_screen()
             continue
+
         if message.startswith(USERNAME_SIGNAL):
             context['username'] = message[len(USERNAME_SIGNAL):]
             append_text(f'[SYSTEM] Your username is {context["username"]}')
             continue
+
         if message.startswith('__PONG__:'):
             try:
                 sent_time = float(message.split(':', 1)[1])
@@ -172,30 +305,37 @@ def receive_messages():
             except (ValueError, IndexError):
                 append_text('[PING] Invalid pong response received.')
             continue
+
         append_text(message)
+
     context['chat_running'] = False
     connected = False
     set_connected_ui(False)
     append_text('[DISCONNECTED]')
 
-
 def process_user_message(message):
     message = message.strip()
+
     if not message:
         return
+    
     if message in ('/disconnect', 'disconnect'):
         disconnect()
         return
+    
     if message in ('/exit', 'exit'):
         context['running'] = False
         disconnect()
+
         if GUI_AVAILABLE and root:
             try:
                 root.quit()
             except tk.TclError:
                 pass
         return
+    
     result = handle_command(message, context, append_text)
+
     if result:
         if not client:
             append_text('[ERROR] Not connected to a server.')
@@ -208,7 +348,6 @@ def process_user_message(message):
             connected = False
             set_connected_ui(False)
 
-
 def send_messages():
     while context['chat_running']:
         try:
@@ -216,19 +355,22 @@ def send_messages():
         except (EOFError, KeyboardInterrupt):
             context['chat_running'] = False
             break
+
         process_user_message(message)
+
     if client:
         client.close()
-
 
 def connect_to_server(host, port, password=""):
     global client
     global connected
+
     try:
         client = open_tcp_connection(host, port, timeout=10)
     except OSError as e:
         append_text(f'[ERROR] {e}')
         set_connected_ui(False)
+
         return
     try:
         client.send(f'__AUTH__:{password}'.encode())
@@ -237,6 +379,7 @@ def connect_to_server(host, port, password=""):
         client.close()
         client = None
         set_connected_ui(False)
+
         return
     try:
         initial_message = client.recv(1024).decode()
@@ -245,13 +388,17 @@ def connect_to_server(host, port, password=""):
         client.close()
         client = None
         set_connected_ui(False)
+
         return
+    
     if not initial_message:
         append_text('[ERROR] Server closed the connection.')
         client.close()
         client = None
         set_connected_ui(False)
+
         return
+    
     if initial_message.startswith(USERNAME_SIGNAL):
         context['username'] = initial_message[len(USERNAME_SIGNAL):]
     else:
@@ -259,7 +406,9 @@ def connect_to_server(host, port, password=""):
         client.close()
         client = None
         set_connected_ui(False)
+
         return
+    
     client.settimeout(None)
     connected = True
     context['chat_running'] = True
@@ -274,31 +423,34 @@ def connect_to_server(host, port, password=""):
     )
     receive_thread.start()
     set_connected_ui(True)
+
     if not GUI_AVAILABLE:
         send_thread = threading.Thread(target=send_messages)
         send_thread.start()
         send_thread.join()
         connected = False
 
-
 def disconnect():
     global client
     global connected
+
     connected = False
     context['chat_running'] = False
     context['client'] = None
+
     if client:
         try:
             client.close()
         except OSError:
             pass
+
     client = None
     set_connected_ui(False)
     append_text('[DISCONNECTED]')
 
-
 def build_gui():
-    global root, chat_text, message_entry, connect_button, disconnect_button, status_label, address_entry, password_entry
+    global root, chat_text, message_entry, connect_button, disconnect_button, status_label, address_entry, password_entry, send_button, theme_button
+    
     root = tk.Tk()
     root.title('Simple Chat Client')
     root.geometry('600x520')
@@ -312,13 +464,17 @@ def build_gui():
     password_entry = tk.Entry(connect_frame, width=42, show='*')
     password_entry.grid(row=1, column=1, sticky='we', padx=5, pady=(5, 0))
     connect_button = tk.Button(connect_frame, text='Connect', width=12, command=gui_connect)
-    connect_button.grid(row=0, column=2, rowspan=2, padx=(10, 0))
+    connect_button.grid(row=0, column=2, padx=(10, 0))
+    theme_button = tk.Button(connect_frame, text='Dark Mode', width=12, command=toggle_theme)
+    theme_button.grid(row=1, column=2, padx=(10, 0), pady=(5, 0))
     status_label = tk.Label(root, text='Disconnected', anchor='w')
     status_label.pack(fill='x', padx=10)
     chat_frame = tk.Frame(root)
     chat_frame.pack(fill='both', expand=True, padx=10, pady=(5, 0))
     chat_text = ScrolledText(chat_frame, state='disabled', wrap='word')
     chat_text.pack(fill='both', expand=True)
+    chat_text.tag_configure('left', justify='left', foreground='black')
+    chat_text.tag_configure('right', justify='right', foreground='#0B5394')
     input_frame = tk.Frame(root)
     input_frame.pack(fill='x', padx=10, pady=10)
     message_entry = tk.Entry(input_frame, state='disabled')
@@ -329,24 +485,27 @@ def build_gui():
     disconnect_button = tk.Button(root, text='Disconnect', state='disabled', command=disconnect)
     disconnect_button.pack(fill='x', padx=10, pady=(0, 10))
     root.protocol('WM_DELETE_WINDOW', on_close)
+    remember_light_options(root)
+    apply_theme()
     set_connected_ui(False)
     append_text('Enter an address or tunnel and click Connect.')
     root.mainloop()
 
-
 def on_send_clicked(event=None):
     if not message_entry:
         return
+    
     message = message_entry.get()
     message_entry.delete(0, 'end')
     process_user_message(message)
 
-
 def gui_connect():
     if not address_entry:
         return
+    
     address = address_entry.get().strip()
     password = password_entry.get().strip()
+
     if not address:
         append_text('[ERROR] Address is required.')
         return
@@ -355,17 +514,17 @@ def gui_connect():
     except ValueError:
         append_text('[ERROR] Use ADDRESS:PORT format.')
         return
+    
     connect_button.config(state='disabled')
     append_text(f'[SYSTEM] Connecting to {host}:{port} ...')
     threading.Thread(target=connect_to_server, args=(host, port, password), daemon=True).start()
 
-
 def on_close():
     context['running'] = False
     disconnect()
+
     if root:
         root.destroy()
-
 
 def print_main_menu():
     print('Main menu:')
@@ -376,19 +535,24 @@ if GUI_AVAILABLE:
     build_gui()
 else:
     print_main_menu()
+
     while context['running']:
         try:
             command = input('>>> ').strip()
         except (EOFError, KeyboardInterrupt):
             break
+
         if not command:
             continue
+
         cmd_parts = command.split()
         cmd_name = cmd_parts[0]
+
         if cmd_name in ('connect', '/connect'):
             try:
                 if len(cmd_parts) < 2:
                     raise ValueError
+                
                 address = cmd_parts[1]
                 password = " ".join(cmd_parts[2:]) if len(cmd_parts) > 2 else ""
                 host, port = parse_server_address(address)

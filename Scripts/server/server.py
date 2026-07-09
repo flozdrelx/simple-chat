@@ -44,6 +44,27 @@ root = None
 chat_text = None
 message_entry = None
 status_label = None
+send_button = None
+shutdown_button = None
+theme_button = None
+dark_mode = False
+light_widget_options = {}
+
+DARK_THEME = {
+    'bg': '#100b1f',
+    'panel': '#181027',
+    'field': '#211631',
+    'text': '#f4efff',
+    'muted': '#c9bce7',
+    'accent': '#9d7cff',
+    'button': '#2c1f42',
+    'button_active': '#3b2a5f',
+    'disabled': '#85779f',
+    'border': '#4c376d',
+    'self_message': '#c7a8ff',
+    'danger': '#7f2435',
+    'danger_active': '#a13046',
+}
 
 context = {
     'running': True,
@@ -114,16 +135,20 @@ def create_server_sockets(host, port, max_clients):
 server_sockets = create_server_sockets(HOST, PORT, MAX_CLIENTS)
 
 context['port'] = PORT
+
 if not GUI_AVAILABLE:
     print(f'[SERVER] Listening on configured port {PORT}...')
+
     for listener in server_sockets:
         print(f'[SERVER] Bound to {listener.getsockname()[0]}:{listener.getsockname()[1]}')
+    
     print(f'[SERVER] Max clients: {MAX_CLIENTS}')
     print('[PRIVACY] Client IP addresses are hidden in this app.')
     print('[SHARE] Use a tunnel address, such as pinggy, when sharing this server.')
 
 def broadcast(message, sender=None):
     removed_client = False
+
     with clients_lock:
         for c in clients[:]:
             if c['socket'] != sender:
@@ -144,6 +169,7 @@ def send_system_message(client, message):
 
 def remove_client(client_socket):
     removed_client = False
+
     with clients_lock:
         for c in clients[:]:
             if c['socket'] == client_socket:
@@ -153,7 +179,6 @@ def remove_client(client_socket):
 
     if removed_client:
         refresh_connected_count()
-
 
 def refresh_connected_count():
     if not GUI_AVAILABLE or not root:
@@ -191,10 +216,12 @@ def handle_client(client, client_id):
     client.settimeout(None)
 
     provided_password = ""
+
     if auth_msg.startswith('__AUTH__:'):
         provided_password = auth_msg.split(':', 1)[1]
 
     expected_password = context.get('password', '')
+
     if expected_password and provided_password != expected_password:
         try:
             client.send('[SERVER] Incorrect password. Connection closed.'.encode())
@@ -211,6 +238,7 @@ def handle_client(client, client_id):
                 client.close()
             except OSError:
                 pass
+
             append_text(f'[REJECTED] {client_label} - server full')
             return
 
@@ -253,15 +281,18 @@ def handle_client(client, client_id):
 
         if message.startswith('__CHANGE_USERNAME__:'):
             new_username = message.split(':', 1)[1]
+
             with clients_lock:
                 for c in clients:
                     if c['socket'] == client:
                         old_username = c['username']
+
                         c['username'] = f'{new_username} (ID: {c["id"]})'
                         try:
                             client.send(f'__SET_USERNAME__:{new_username} (ID: {c["id"]})'.encode())
                         except OSError:
                             pass
+
                         append_text(f'[INFO] ID {c["id"]} changed username from {old_username} to {new_username} (ID: {c["id"]})')
                         break
             continue
@@ -304,7 +335,6 @@ def shutdown_server():
     for listener in server_sockets:
         listener.close()
 
-
 def append_text(message, tag='left'):
     if not message:
         return
@@ -323,7 +353,6 @@ def append_text(message, tag='left'):
     else:
         print(message)
 
-
 def clear_screen():
     if GUI_AVAILABLE and root and chat_text:
         def clear_text():
@@ -341,6 +370,7 @@ def clear_screen():
 
 def process_host_message(message):
     message = message.strip()
+
     if not message:
         return
 
@@ -361,7 +391,6 @@ def process_host_message(message):
         except tk.TclError:
             pass
 
-
 def on_send_clicked(event=None):
     if not message_entry:
         return
@@ -370,7 +399,6 @@ def on_send_clicked(event=None):
     message_entry.delete(0, 'end')
     process_host_message(message)
 
-
 def set_connected_ui(value):
     if not GUI_AVAILABLE or not root:
         return
@@ -378,8 +406,10 @@ def set_connected_ui(value):
     def update():
         if value:
             message_entry.config(state='normal')
+
             with clients_lock:
                 user_count = len(clients)
+
             status_label.config(text=f'Host running | {user_count} users connected')
         else:
             message_entry.config(state='disabled')
@@ -390,6 +420,115 @@ def set_connected_ui(value):
     except tk.TclError:
         pass
 
+def remember_light_options(widget):
+    options = {}
+
+    for option in (
+        'background',
+        'foreground',
+        'activebackground',
+        'activeforeground',
+        'insertbackground',
+        'selectbackground',
+        'selectforeground',
+        'disabledforeground',
+        'highlightbackground',
+        'highlightcolor',
+    ):
+        try:
+            options[option] = widget.cget(option)
+        except tk.TclError:
+            pass
+
+    light_widget_options[widget] = options
+
+    for child in widget.winfo_children():
+        remember_light_options(child)
+
+
+def configure_widget(widget, **options):
+    for option, value in options.items():
+        try:
+            widget.configure(**{option: value})
+        except tk.TclError:
+            pass
+
+
+def restore_light_theme(widget):
+    defaults = light_widget_options.get(widget, {})
+
+    if defaults:
+        configure_widget(widget, **defaults)
+    for child in widget.winfo_children():
+        restore_light_theme(child)
+
+
+def apply_dark_theme(widget):
+    widget_class = widget.winfo_class()
+
+    configure_widget(
+        widget,
+        background=DARK_THEME['bg'],
+        foreground=DARK_THEME['text'],
+        activebackground=DARK_THEME['button_active'],
+        activeforeground=DARK_THEME['text'],
+        insertbackground=DARK_THEME['text'],
+        selectbackground=DARK_THEME['accent'],
+        selectforeground=DARK_THEME['bg'],
+        disabledforeground=DARK_THEME['disabled'],
+        highlightbackground=DARK_THEME['border'],
+        highlightcolor=DARK_THEME['accent'],
+    )
+
+    if widget_class == 'Frame':
+        configure_widget(widget, background=DARK_THEME['panel'])
+    elif widget_class in ('Entry', 'Text'):
+        configure_widget(
+            widget,
+            background=DARK_THEME['field'],
+            foreground=DARK_THEME['text'],
+            insertbackground=DARK_THEME['text'],
+        )
+    elif widget_class == 'Button':
+        configure_widget(
+            widget,
+            background=DARK_THEME['button'],
+            foreground=DARK_THEME['text'],
+            activebackground=DARK_THEME['button_active'],
+            activeforeground=DARK_THEME['text'],
+        )
+    elif widget_class == 'Label':
+        configure_widget(widget, background=DARK_THEME['bg'], foreground=DARK_THEME['muted'])
+    
+    for child in widget.winfo_children():
+        apply_dark_theme(child)
+
+
+def apply_theme():
+    if not GUI_AVAILABLE or not root:
+        return
+    
+    if dark_mode:
+        apply_dark_theme(root)
+        chat_text.tag_configure('left', justify='left', foreground=DARK_THEME['text'])
+        chat_text.tag_configure('right', justify='right', foreground=DARK_THEME['self_message'])
+        theme_button.config(text='Light Mode')
+        shutdown_button.config(
+            bg=DARK_THEME['danger'],
+            fg=DARK_THEME['text'],
+            activebackground=DARK_THEME['danger_active'],
+            activeforeground=DARK_THEME['text'],
+        )
+    else:
+        restore_light_theme(root)
+        chat_text.tag_configure('left', justify='left', foreground='black')
+        chat_text.tag_configure('right', justify='right', foreground='#0B5394')
+        theme_button.config(text='Dark Mode')
+
+def toggle_theme():
+    global dark_mode
+    dark_mode = not dark_mode
+    apply_theme()
 
 def accept_clients():
     global next_client_id
@@ -415,16 +554,21 @@ def accept_clients():
         except (OSError, ValueError):
             break
 
-
 def build_server_gui():
-    global root, chat_text, message_entry, status_label
+    global root, chat_text, message_entry, status_label, send_button, shutdown_button, theme_button
 
     root = tk.Tk()
     root.title('Simple Chat Host')
     root.geometry('620x520')
 
-    status_label = tk.Label(root, text='Host console active', anchor='w')
-    status_label.pack(fill='x', padx=10, pady=(10, 0))
+    top_frame = tk.Frame(root)
+    top_frame.pack(fill='x', padx=10, pady=(10, 0))
+
+    status_label = tk.Label(top_frame, text='Host console active', anchor='w')
+    status_label.pack(side='left', fill='x', expand=True)
+
+    theme_button = tk.Button(top_frame, text='Dark Mode', width=12, command=toggle_theme)
+    theme_button.pack(side='right', padx=(10, 0))
 
     chat_text = ScrolledText(root, state='disabled', wrap='word')
     chat_text.pack(fill='both', expand=True, padx=10, pady=10)
@@ -445,18 +589,19 @@ def build_server_gui():
     shutdown_button.pack(fill='x', padx=10, pady=(0, 10))
 
     root.protocol('WM_DELETE_WINDOW', on_close)
+    remember_light_options(root)
+    apply_theme()
     set_connected_ui(True)
     append_text(f'[SERVER] Listening on {HOST}:{PORT}')
     append_text('Host GUI active. Type a message and press Send.')
     root.mainloop()
 
-
 def on_close():
     context['running'] = False
     shutdown_server()
+
     if root:
         root.destroy()
-
 
 def send_messages():
     while context['running']:
