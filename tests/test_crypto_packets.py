@@ -12,7 +12,6 @@ try:
 except ImportError:
     hexium_crypto = None
 
-
 @unittest.skipIf(hexium_crypto is None, 'build rust-crypto before integration tests')
 class CryptoPacketTests(unittest.TestCase):
     @classmethod
@@ -22,6 +21,7 @@ class CryptoPacketTests(unittest.TestCase):
     def identities(self):
         a_priv, a_pub = map(bytes, self.crypto._rust.generate_identity())
         b_priv, b_pub = map(bytes, self.crypto._rust.generate_identity())
+
         return (a_priv, self.crypto.Identity(a_priv, a_pub)), (b_priv, self.crypto.Identity(b_priv, b_pub))
 
     def test_private_key_is_not_serialized(self):
@@ -39,6 +39,7 @@ class CryptoPacketTests(unittest.TestCase):
         raw = bytearray(base64.b64decode(altered['ciphertext']))
         raw[0] ^= 1
         altered['ciphertext'] = base64.b64encode(raw).decode()
+
         with self.assertRaises(self.crypto.CryptoError):
             receiver.decrypt_envelope('b', sender.public_b64, json.dumps(altered).encode())
 

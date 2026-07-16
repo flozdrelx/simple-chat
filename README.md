@@ -82,15 +82,6 @@ You can now test the chat application.
 
 ---
 
-# Planned Features
-
-* Improved privacy and security systems
-* Additional networking improvements using C/C++
-* Redesigned GUI inspired by the Hexium aesthetic
-* Better customization and room management
-
----
-
 # Commands
 
 Use:
