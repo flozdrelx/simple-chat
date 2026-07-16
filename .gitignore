@@ -16,6 +16,8 @@ dist/
 *.egg-info/
 .eggs/
 
+rust-crypto/target/
+
 *.log
 logs/
 

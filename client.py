@@ -416,7 +416,7 @@ def connect_to_server(host, port, password=""):
     context['client'] = client
     clear_screen()
     append_text('[CONNECTED] Connected to server.')
-    append_text(f'[SYSTEM] Your username is {context["username"]}')
+    append_text(f'[SYSTEM] Your username is {context["username"]}.')
     receive_thread = threading.Thread(
         target=receive_messages,
         daemon=True
@@ -452,7 +452,7 @@ def build_gui():
     global root, chat_text, message_entry, connect_button, disconnect_button, status_label, address_entry, password_entry, send_button, theme_button
     
     root = tk.Tk()
-    root.title('Simple Chat Client')
+    root.title('Chat Client')
     root.geometry('600x520')
     connect_frame = tk.LabelFrame(root, text='Connect to Server', padx=10, pady=10)
     connect_frame.pack(fill='x', padx=10, pady=10)

@@ -4,5 +4,7 @@
     "share_address": "",
     "port": 6667,
     "max_clients": 50,
-    "message_cooldown": 1
+    "message_cooldown": 1,
+    "allow_images": false,
+    "image_rate_limit": 5
 }

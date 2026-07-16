@@ -73,16 +73,17 @@ You can now test the chat application.
 * Hosts can participate in the chat
 * Basic chat commands
 * Host moderation commands
+* Host client manager with connection UUIDs and one-click kicking
 * TCP tunneling support
 * Graphical User Interface (GUI)
 * Room password support
+* End-to-end encrypted text and PNG/JPG/WEBP image sharing
 * Open source and self-hosted architecture
 
 ---
 
 # Planned Features
 
-* Encrypted message traffic
 * Improved privacy and security systems
 * Additional networking improvements using C/C++
 * Redesigned GUI inspired by the Hexium aesthetic
@@ -99,6 +100,59 @@ Use:
 ```
 
 to view all available chat commands.
+
+Hosts can toggle image sharing with `/allowimgs` and configure the per-user
+images-per-minute limit with `/imglimit <count>` (default: 5). GUI users can
+use the Image button; terminal users can use `/image <path>`.
+
+Hosts can manage active connections from the GUI's **Clients** tab. Each
+connection has a numeric session ID and a UUID. `/see_users` lists both, and
+`/kick <id|uuid>` accepts either a numeric ID or a unique UUID prefix.
+
+Images are decoded and re-saved with Pillow before transmission, removing EXIF
+and other source metadata. Files larger than 5 MB are recompressed and resized
+when necessary; SVG and formats other than PNG, JPG, and WEBP are rejected.
+
+Install dependencies before starting:
+
+```bash
+python -m pip install -r requirements.txt
+python -m pip install ./rust-crypto
+```
+
+The second command builds the Rust crypto extension. It requires the stable
+Rust toolchain (including Cargo). The application refuses to start if this
+module is absent; there is no plaintext fallback.
+
+## End-to-end encryption
+
+Each installation creates a local X25519 identity at
+`~/.hexium-chat/identity.key`. Only its public key is registered with the room.
+For each recipient, the Rust module derives a distinct session key with
+X25519 and HKDF-SHA256, then authenticates and encrypts the text or sanitized
+image bytes using XChaCha20-Poly1305 and a fresh 192-bit OS-random nonce.
+
+Group messages use a per-recipient envelope. The host is a normal room
+participant and receives its own encrypted recipient box, allowing one client
+to chat directly with the host without requiring a second client. The host
+decrypts that box locally while relaying the original envelope unchanged to
+other clients. Host-authored messages are likewise encrypted for every
+connected client.
+Private keys and derived keys never enter protocol frames or logs. A failed
+authentication check produces a generic client error and the payload is
+discarded.
+
+The client shows its public-key fingerprint after connecting. Compare
+fingerprints with contacts over a separate trusted channel when protection
+against an actively malicious relay is required; room passwords and transport
+encryption alone do not authenticate first contact.
+
+Run the crypto and packet tests with:
+
+```bash
+cargo test --manifest-path rust-crypto/Cargo.toml
+python -m unittest discover -s tests
+```
 
 ---
 

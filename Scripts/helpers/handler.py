@@ -16,6 +16,8 @@ from ping import ping
 from see_users import see_users
 from kick import kick
 from set_pswd import set_pswd
+from allowimgs import allowimgs
+from imglimit import imglimit
 
 COMMANDS = {
     '/clear': clear,
@@ -26,7 +28,9 @@ COMMANDS = {
     '/ping': ping,
     '/see_users': see_users,
     '/kick': kick,
-    '/set_pswd': set_pswd
+    '/set_pswd': set_pswd,
+    '/allowimgs': allowimgs,
+    '/imglimit': imglimit
 }
 
 def handle_command(message, context, output_func=print):

@@ -12,6 +12,6 @@ def ping(args, context, output_func=print):
     client = context['client']
     try:
         sent_time = time.time()
-        client.send(f'__PING__:{sent_time}'.encode())
+        context['send_text'](f'__PING__:{sent_time}')
     except OSError:
         output_func('[ERROR] Failed to send ping request.')

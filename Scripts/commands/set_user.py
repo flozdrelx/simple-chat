@@ -10,7 +10,7 @@ def set_user(args, context, output_func=print):
     client = context.get('client')
     if client:
         try:
-            client.send(f'__CHANGE_USERNAME__:{username}'.encode())
+            context['send_text'](f'__CHANGE_USERNAME__:{username}')
         except OSError:
             pass
 

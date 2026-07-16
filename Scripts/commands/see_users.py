@@ -17,5 +17,8 @@ def see_users(args, context, output_func=print):
 
         output_func('\n=== Connected Users ===')
         for c in clients:
-            output_func(f"ID: {c['id']} | Username: {c['username']}")
+            output_func(
+                f"ID: {c['id']} | UUID: {c.get('uuid', 'unknown')} | "
+                f"Username: {c['username']}"
+            )
         output_func('=======================\n')
